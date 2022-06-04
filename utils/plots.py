@@ -118,7 +118,7 @@ class Annotator:
     def text(self, xy, text, txt_color=(255, 255, 255)):
         # Add text to image (PIL-only)
         w, h = self.font.getsize(text)  # text width, height
-        self.draw.text((xy[0], xy[1] - h + 1), text, fill=txt_color, font=self.font)
+        self.draw.text((xy[0] - w, xy[1] - h + 1), text, fill=txt_color, font=self.font)
 
     def result(self):
         # Return annotated image as array
