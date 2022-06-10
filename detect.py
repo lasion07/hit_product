@@ -195,7 +195,7 @@ def run(
             im0 = annotator.result()
             if view_img:
                 cv2.imshow(str(p), im0)
-                if cv2.waitKey(1) and 0xFF == ord('q'):  # 1 millisecond
+                if cv2.waitKey(1) and 0xff == ord('q'):  # 1 millisecond
                     break
 
             # Save results (image with detections)
