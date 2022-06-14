@@ -52,6 +52,7 @@ def run(
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
+        warning_pos=[90, 90, 480, 720],
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
@@ -160,6 +161,11 @@ def run(
             else:  # stream
                 fps, w, h = 30, im0.shape[1], im0.shape[0]
 
+            # Warning area check
+            check_warning = True
+            w_pos = [torch.tensor(i) for i in warning_pos]
+            warning = False
+
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
@@ -172,12 +178,20 @@ def run(
                         with open('log.txt', 'a') as f:
                             f.write(f"Time {round(t1 - t, 2)} s: {n} person{'s' * (n > 1)} in the frame" + '\n')
                         # Display number of persons counted:
-                        annotator.text((w, h), f"Detected {n} person{'s' * (n > 1)} in the frame", txt_color=(0, 255, 0))
+                        annotator.text((w, h), f"Detected {n} person{'s' * (n > 1)} in the frame",
+                                       txt_color=(0, 255, 0))
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
-                    if cls != torch.tensor(0):
-                        continue
+                    if check_warning:  # Check collide with warning area
+                        if not warning:
+                            obj_pos = [float(i) for i in xyxy]
+
+                            # w_pos = [x1, y1, x2, y2]
+                            if w_pos[0] < obj_pos[2] and w_pos[2] > obj_pos[0] and \
+                                    w_pos[1] < obj_pos[3] and w_pos[3] > obj_pos[1]:
+                                warning = True
+
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
@@ -190,6 +204,10 @@ def run(
                         annotator.box_label(xyxy, label, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+
+            # Warning box
+            annotator.box_label(w_pos, label=f'Colliders: {names[c]}' if warning else 'Warning area',
+                                color=(0, 0, 255) if warning else (128, 128, 128))
 
             # Stream results
             im0 = annotator.result()
