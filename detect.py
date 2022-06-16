@@ -32,7 +32,7 @@ from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
 
-from lasion import *
+from lvhn import *
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
