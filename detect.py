@@ -32,6 +32,8 @@ from pathlib import Path
 import torch
 import torch.backends.cudnn as cudnn
 
+from lasion import *
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -40,7 +42,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
-from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
+from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2, np,
                            increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, time_sync
@@ -52,8 +54,9 @@ def run(
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
-        warning_pos=[90, 90, 480, 720],
+        warning_pos=ROOT / 'warning/location.txt',
         conf_thres=0.25,  # confidence threshold
+        check_warning = True,
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -81,6 +84,7 @@ def run(
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
     webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
+    pts = read_pts(warning_pos)
     if is_url and is_file:
         source = check_file(source)  # download
 
@@ -161,9 +165,7 @@ def run(
             else:  # stream
                 fps, w, h = 30, im0.shape[1], im0.shape[0]
 
-            # Warning area check
-            check_warning = True
-            w_pos = [torch.tensor(i) for i in warning_pos]
+            # Check warning
             warning = False
 
             if len(det):
@@ -185,11 +187,9 @@ def run(
                 for *xyxy, conf, cls in reversed(det):
                     if check_warning:  # Check collide with warning area
                         if not warning:
-                            obj_pos = [float(i) for i in xyxy]
+                            x1, y1, x2, y2 = (float(i) for i in xyxy)
 
-                            # w_pos = [x1, y1, x2, y2]
-                            if w_pos[0] < obj_pos[2] and w_pos[2] > obj_pos[0] and \
-                                    w_pos[1] < obj_pos[3] and w_pos[3] > obj_pos[1]:
+                            if geometry().is_inside_polygon(pts, (x1, y2)) or geometry().is_inside_polygon(pts, (x2, y2)):
                                 warning = True
 
                     if save_txt:  # Write to file
@@ -205,13 +205,10 @@ def run(
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
-            # Warning box
-            annotator.box_label(w_pos, label=f'Colliders: {names[c]}' if warning else 'Warning area',
-                                color=(0, 0, 255) if warning else (128, 128, 128))
-
             # Stream results
             im0 = annotator.result()
             if view_img:
+                cv2.polylines(im0,[pts.reshape(-1, 1, 2)],True,color=(0, 0, 255) if warning else (128, 128, 128), thickness=10) # Warning area
                 cv2.imshow(str(p), im0)
                 if cv2.waitKey(1) and 0xff == ord('q'):  # 1 millisecond
                     break
