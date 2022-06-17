@@ -5,7 +5,7 @@ python detect.py --source 0 --nosave --classes 0
 ```
 
 # Detection
-> We use YYolov5 algorithm for human and weapon detection
+> We use Yolov5 algorithm for human and weapon detection
 
 # Warning intrusion
 Determine a label box within a warning area.
