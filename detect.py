@@ -56,7 +56,7 @@ def run(
         imgsz=(640, 640),  # inference size (height, width)
         warning_pos=ROOT / 'warning/location.txt',
         conf_thres=0.25,  # confidence threshold
-        check_warning = True,
+        check_warning = True, # check warning area
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -208,7 +208,8 @@ def run(
             # Stream results
             im0 = annotator.result()
             if view_img:
-                cv2.polylines(im0,[pts.reshape(-1, 1, 2)],True,color=(0, 0, 255) if warning else (128, 128, 128), thickness=10) # Warning area
+                if check_warning:
+                    cv2.polylines(im0,[pts.reshape(-1, 1, 2)],True,color=(0, 0, 255) if warning else (128, 128, 128), thickness=2) # Warning area
                 cv2.imshow(str(p), im0)
                 if cv2.waitKey(1) and 0xff == ord('q'):  # 1 millisecond
                     break
