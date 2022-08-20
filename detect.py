@@ -59,7 +59,7 @@ def run(
         check_warning = True, # check warning area
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
-        device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+        device=' ',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         view_img=False,  # show results
         save_txt=False,  # save results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
@@ -84,7 +84,7 @@ def run(
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
     webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
-    pts = read_pts(warning_pos)
+    # pts = read_pts(warning_pos)
     if is_url and is_file:
         source = check_file(source)  # download
 
@@ -105,12 +105,13 @@ def run(
         dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)
         bs = len(dataset)  # batch_size
     else:
+        view_img = check_imshow()
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
         bs = 1  # batch_size
     vid_path, vid_writer = [None] * bs, [None] * bs
 
-    # Erase output.txt
-    open('log.txt', 'w').close()
+    # Erase location.txt
+    # open('warning/location.txt', 'w').close()
 
     # Time_sync
     t = time_sync()
@@ -141,6 +142,10 @@ def run(
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
 
+        # Check warning
+        warning = False
+        pts = read_pts(warning_pos)
+
         # Process predictions
         for i, det in enumerate(pred):  # per image
             seen += 1
@@ -165,9 +170,6 @@ def run(
             else:  # stream
                 fps, w, h = 30, im0.shape[1], im0.shape[0]
 
-            # Check warning
-            warning = False
-
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
@@ -177,11 +179,13 @@ def run(
                     n = (det[:, -1] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
                     if names[int(c)] == 'person':
-                        with open('log.txt', 'a') as f:
-                            f.write(f"Time {round(t1 - t, 2)} s: {n} person{'s' * (n > 1)} in the frame" + '\n')
+                        # with open('log.txt', 'a') as f:
+                        #     f.write(f"Time {round(t1 - t, 2)} s: {n} person{'s' * (n > 1)} in the frame" + '\n')
                         # Display number of persons counted:
                         annotator.text((w, h), f"Detected {n} person{'s' * (n > 1)} in the frame",
                                        txt_color=(0, 255, 0))
+                        if n >= 2:
+                            print('checking')
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
@@ -189,7 +193,7 @@ def run(
                         if not warning:
                             x1, y1, x2, y2 = (float(i) for i in xyxy)
 
-                            if geometry().is_inside_polygon(pts, (x1, y2)) or geometry().is_inside_polygon(pts, (x2, y2)):
+                            if geometry().is_inside_polygon(pts, ((x1+x2)/2, y2)):
                                 warning = True
 
                     if save_txt:  # Write to file
@@ -209,6 +213,7 @@ def run(
             im0 = annotator.result()
             if view_img:
                 cv2.setMouseCallback(str(p), get_mouse_pos)
+
                 if check_warning:
                     cv2.polylines(im0,[pts.reshape(-1, 1, 2)],True,color=(0, 0, 255) if warning else (0, 255, 0), thickness=2) # Warning area
                 cv2.imshow(str(p), im0)
@@ -229,7 +234,7 @@ def run(
                     vid_writer[i].write(im0)
 
         # Print time (inference-only)
-        # LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
+        LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image

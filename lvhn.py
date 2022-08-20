@@ -123,12 +123,12 @@ class geometry:
 def read_pts(filename):
     # Polygon corner points coordinates
     with open(filename, mode='r') as f:
-        pts = []
-        for line in f:
-            pts.append(line.split())
+        pts = [line.split() for line in f]
         return np.array(pts, np.int32)
 
 
 def get_mouse_pos(event, x, y, flags, param):
-    if event == cv2.EVENT_MOUSEMOVE:
-        print(x, y)
+    if event == cv2.EVENT_LBUTTONDOWN:
+        #  Write waring_pos
+        with open('warning/location.txt', mode='a') as f:
+            f.write(f'{x} {y}\n')
